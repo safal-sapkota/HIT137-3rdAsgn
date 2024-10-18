@@ -1,0 +1,236 @@
+import pygame
+import random
+
+# Initialize Pygame
+pygame.init()
+
+# Constants
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 300
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
+
+# Set up screen
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Epic Tank Runner")
+
+# Clock and font
+clock = pygame.time.Clock()
+font = pygame.font.SysFont(None, 40)
+
+# Classes
+class Player(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((50, 30))
+        self.image.fill(BLUE)
+        self.rect = self.image.get_rect()
+        self.rect.center = (100, SCREEN_HEIGHT - 70)
+        self.base_y = SCREEN_HEIGHT - 70
+        self.speed_y = 0
+        self.gravity = 0.5
+        self.health = 100
+        self.lives = 3
+        self.score = 0
+        self.level = 1
+
+    def update(self):
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_UP]:
+            self.speed_y = -5
+        if keys[pygame.K_DOWN]:
+            self.speed_y = 5
+
+        self.rect.y += self.speed_y
+
+        # Apply gravity when above ground
+        if self.rect.y < self.base_y:
+            self.speed_y += self.gravity
+        else:
+            self.rect.y = self.base_y
+            self.speed_y = 0
+
+        # Keep player on screen
+        if self.rect.top < 0:
+            self.rect.top = 0
+        if self.rect.bottom > SCREEN_HEIGHT - 50:
+            self.rect.bottom = SCREEN_HEIGHT - 50
+
+    def shoot(self):
+        bullet = Projectile(self.rect.right, self.rect.centery)
+        all_sprites.add(bullet)
+        bullets.add(bullet)
+
+    def take_damage(self, amount):
+        self.health -= amount
+        if self.health <= 0:
+            self.lives -= 1
+            self.health = 100
+            if self.lives <= 0:
+                game_over()
+
+class Projectile(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        self.image = pygame.Surface((10, 5))
+        self.image.fill(RED)
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y)
+        self.speed_x = 7
+
+    def update(self):
+        self.rect.x += self.speed_x
+        if self.rect.left > SCREEN_WIDTH:
+            self.kill()
+
+class Target(pygame.sprite.Sprite):
+    def __init__(self, speed):
+        super().__init__()
+        self.image = pygame.Surface((30, 30))
+        self.image.fill(GREEN)
+        self.rect = self.image.get_rect()
+        self.rect.x = SCREEN_WIDTH
+        self.rect.y = random.randint(50, SCREEN_HEIGHT - 50)
+        self.speed_x = speed
+
+    def update(self):
+        self.rect.x += self.speed_x
+        if self.rect.right < 0:
+            self.kill()
+
+class Obstacle(pygame.sprite.Sprite):
+    def __init__(self, speed):
+        super().__init__()
+        self.image = pygame.Surface((30, 30))
+        self.image.fill(RED)
+        self.rect = self.image.get_rect()
+        self.rect.x = SCREEN_WIDTH
+        self.rect.y = SCREEN_HEIGHT - 80
+        self.speed_x = speed
+
+    def update(self):
+        self.rect.x += self.speed_x
+        if self.rect.right < 0:
+            self.kill()
+
+# Health bar
+def draw_health_bar(surf, x, y, pct):
+    if pct < 0:
+        pct = 0
+    BAR_LENGTH = 100
+    BAR_HEIGHT = 10
+    fill = (pct / 100) * BAR_LENGTH
+    outline_rect = pygame.Rect(x, y, BAR_LENGTH, BAR_HEIGHT)
+    fill_rect = pygame.Rect(x, y, fill, BAR_HEIGHT)
+    pygame.draw.rect(surf, GREEN, fill_rect)
+    pygame.draw.rect(surf, WHITE, outline_rect, 2)
+
+# Game reset function
+def reset_game():
+    player.health = 100
+    player.lives = 3
+    player.score = 0
+    player.level = 1
+    all_sprites.empty()
+    obstacles.empty()
+    targets.empty()
+    bullets.empty()
+    all_sprites.add(player)
+
+# Game over screen
+def game_over():
+    screen.fill(BLACK)
+    game_over_text = font.render("GAME OVER", True, RED)
+    restart_text = font.render("Press 'R' to Restart", True, WHITE)
+    screen.blit(game_over_text, (SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT // 2 - 50))
+    screen.blit(restart_text, (SCREEN_WIDTH // 2 - 150, SCREEN_HEIGHT // 2 + 50))
+    pygame.display.flip()
+
+    waiting = True
+    while waiting:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
+                waiting = False
+                reset_game()  # Reset game when "R" is pressed
+
+# All sprite groups
+all_sprites = pygame.sprite.Group()
+obstacles = pygame.sprite.Group()
+bullets = pygame.sprite.Group()
+targets = pygame.sprite.Group()
+
+# Player instance
+player = Player()
+all_sprites.add(player)
+
+# Game loop
+running = True
+obstacle_timer = 0
+target_timer = 0
+obstacle_speed = -5
+
+while running:
+    clock.tick(60)
+
+    # Events
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                player.shoot()  # Shoot when space is pressed
+
+    # Update
+    all_sprites.update()
+
+    # Add new obstacles periodically
+    if obstacle_timer > 40 - (player.level * 2):  # Faster obstacle spawning with levels
+        obstacle = Obstacle(obstacle_speed - player.level)  # Increase obstacle speed with level
+        all_sprites.add(obstacle)
+        obstacles.add(obstacle)
+        obstacle_timer = 0
+    obstacle_timer += 1
+
+    # Add new targets periodically
+    if target_timer > 80 - (player.level * 10):  # Targets appear with higher frequency
+        target = Target(obstacle_speed - player.level)  # Increase target speed with level
+        all_sprites.add(target)
+        targets.add(target)
+        target_timer = 0
+    target_timer += 1
+
+    # Check for collisions between player and obstacles
+    if pygame.sprite.spritecollideany(player, obstacles):
+        player.take_damage(10)
+
+    # Check for collisions between bullets and targets
+    hits = pygame.sprite.groupcollide(bullets, targets, True, True)
+    for hit in hits:
+        player.score += 20  # Increase score for destroying a target
+
+    # Draw
+    screen.fill(WHITE)
+    all_sprites.draw(screen)
+
+    # Draw health bar
+    draw_health_bar(screen, 10, 10, player.health)
+
+    # Display score and level
+    player.score += 1  # Increase score over time
+    score_text = font.render(f"Score: {player.score}  Level: {player.level}", True, BLACK)
+    screen.blit(score_text, (SCREEN_WIDTH - 300, 10))
+
+    # Level progression (max level 3)
+    if player.score % 100 == 0 and player.level < 3:  # Every 100 points, increase level up to level 3
+        player.level += 1
+
+    # Flip the display
+    pygame.display.flip()
+
+pygame.quit()
