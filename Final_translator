@@ -1,0 +1,73 @@
+import tkinter as tk
+from tkinter import messagebox
+from googletrans import Translator  # Importing Translator from googletrans
+
+# Base class for GUI application
+class BaseApp:
+    def __init__(self, master):
+        self.master = master
+        self.master.title("Language Translation App")
+        self.create_widgets()
+
+    def create_widgets(self):
+        raise NotImplementedError("Subclasses should implement this!")
+
+# Derived class combining GUI and translation
+class TranslationApp(BaseApp):
+    def __init__(self, master):
+        super().__init__(master)
+        self.translator = Translator()  # Initialize the Translator
+
+    def create_widgets(self):
+        # Input label and text box
+        self.input_label = tk.Label(self.master, text="Enter text to translate:")
+        self.input_label.pack(pady=5)
+
+        self.input_text = tk.Text(self.master, height=5, width=40)  # Using Text widget for multiline input
+        self.input_text.pack(pady=5)
+
+        # Language selection
+        self.language_label = tk.Label(self.master, text="Select target language:")
+        self.language_label.pack(pady=5)
+
+        self.language_var = tk.StringVar(value='es')  # Default to Spanish
+        self.language_options = tk.OptionMenu(self.master, self.language_var, 'es', 'fr', 'de', 'it')  # Options for Spanish, French, German, Italian
+        self.language_options.pack(pady=5)
+
+        # Translate button
+        self.translate_button = tk.Button(self.master, text="Translate", command=self.translate_text)
+        self.translate_button.pack(pady=10)
+
+        # Output label
+        self.output_label = tk.Label(self.master, text="Translated text:")
+        self.output_label.pack(pady=5)
+
+        self.output_text = tk.Label(self.master, text="", wraplength=300)
+        self.output_text.pack(pady=5)
+
+    def translate_text(self):
+        text = self.get_input_text()
+        target_language = self.language_var.get()  # Get the selected language
+        if not text.strip():  # Check if input is empty
+            messagebox.showwarning("Input Error", "Please enter text to translate.")
+            return
+        try:
+            translated = self.translator.translate(text, dest=target_language)  # Translate to selected language
+            self.show_output(translated.text)  # Show the translated text
+        except Exception as error:
+            messagebox.showerror("Translation Error", str(error))  # Handle errors
+
+    def get_input_text(self):
+        return self.input_text.get("1.0", tk.END)  # Get text from Text widget
+
+    def show_output(self, translated_text):
+        self.output_text.config(text=translated_text)  # Update the output label with the translated text
+
+# Main function to run the application
+def main():
+    root = tk.Tk()
+    app = TranslationApp(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
